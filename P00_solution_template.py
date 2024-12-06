@@ -1,4 +1,4 @@
-from Pxx_input import DEMO_INPUT1, DEMO_INPUT2, PRODUCTION_INPUT
+#from Pxx_input import DEMO_INPUT1, DEMO_INPUT2, PRODUCTION_INPUT
 
 import sys
 if len(sys.argv) > 1 and sys.argv[1].startswith('d'):
