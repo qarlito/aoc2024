@@ -70,3 +70,24 @@ print(f'Part 1 total = {part1_total}')
 
 part2_total = find_total([(lambda a,b: a+b), (lambda a,b: a*b), (lambda a,b: int(str(a)+str(b)))], INPUT)
 print(f'Part 2 total = {part2_total}')
+
+
+# Part 2 - Recursive approach
+
+def try_results(goal, intermediate_value, terms, len_terms, offset):
+    if offset == len_terms:
+         return intermediate_value == goal
+    return try_results(goal, intermediate_value + terms[offset], terms, len_terms, offset+1) or \
+           try_results(goal, intermediate_value * terms[offset], terms, len_terms, offset+1) or \
+           try_results(goal, int(str(intermediate_value) + str(terms[offset])), terms, len_terms, offset+1)
+
+total = 0
+for line in INPUT.splitlines():
+    goal, terms = line.strip().split(': ')
+    goal = int(goal)
+    terms = [int(term) for term in terms.split(' ')]
+    if try_results(goal, 0, terms, len(terms), 0):
+        total += goal
+
+print(f'Part 2 (recursive) total = {total}')
+
