@@ -8,4 +8,6 @@ else:
     INPUT1 = PRODUCTION_INPUT.strip()
     INPUT2 = INPUT1
 
+INPUT = INPUT1
+
 
