@@ -55,7 +55,12 @@ def find_total(operations, raw_input):
                 else:
                     new_operation_number = BACKTRACK_OPERATION_NUMBER
             else:
-                new_operation_number = FIRST_OPERATION_NUMBER
+                # Optimization: Early abort if our intermediate value is too high
+                #               This is correct since the operations can never make the value decrease.
+                if new_value > goal:
+                    new_operation_number = BACKTRACK_OPERATION_NUMBER
+                else:
+                    new_operation_number = FIRST_OPERATION_NUMBER
 
             # Extend
             state.append((new_operation_number, new_value))
@@ -70,6 +75,7 @@ print(f'Part 1 total = {part1_total}')
 
 part2_total = find_total([(lambda a,b: a+b), (lambda a,b: a*b), (lambda a,b: int(str(a)+str(b)))], INPUT)
 print(f'Part 2 total = {part2_total}')
+
 
 
 # Part 2 - Recursive approach
