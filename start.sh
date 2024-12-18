@@ -17,7 +17,7 @@ fi
 
 cp P00_input_template.py ${INPUT}
 
-echo "#!/usr/local/bin/python" > ${SOLUTION}
+echo "#!./venv/bin/python3" > ${SOLUTION}
 echo "from P${num}_input import DEMO_INPUT1, DEMO_INPUT2, PRODUCTION_INPUT" >> ${SOLUTION}
 cat P00_solution_template.py >> ${SOLUTION}
 chmod u+x ${SOLUTION}
