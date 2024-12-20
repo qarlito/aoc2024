@@ -22,4 +22,6 @@ def debug(s, new_line_before=False, new_line_after=False):
 DEBUG = DEMO
 INPUT = INPUT1
 
+from collections import defaultdict
+
 
