@@ -1,0 +1,421 @@
+
+Let us number our pads and robots
+
+ human - dirpadHUMAN - robot1 - dirpad1 - robot2 - dirpad2 - ... - robot25 - dirpad25 - robotNUM - numpad
+
+ robotNUM is also called robot26
+
+
+numpad is operated by robotNUM.
+
+The only way to enter the required code is to send the following instructions to robotNUM:
+1a/ send a sequence of move instructions, with net effect to move from start position (A) to first code symbol
+1b/ send a push instruction
+2a/ send a sequence of move instructions, with net effect to move from first code symbol to second code symbol
+2b/ send a push instruction
+3a/ send a sequence of move instructions, with net effect to move from second code symbol to third code symbol
+3b/ send a push instruction
+4a/ send a sequence of move instructions, with net effect to move from third code symbol to fourth code symbol (A)
+4b/ send a push instruction
+
+In steps 1b/2b/3b/4b, a push instruction can only be send if all robot1..robot25 are in position A, and the human subsequently presses A on dirpadHUMAN
+This means that steps 1b/2b/3b/4b always end with
+  robot1..robot25 in position A
+  robotNUM in the position of the code symbol that was just entered.
+
+This also means that step 2a/3a/4a start with robot1..robot25 all in position A since their start position equals the end position of the previous step.
+As a matter of fact we know also that step 1a also starts with robot1..robot25 all in positionA.
+
+Summary: In order to subsequently enter code symbols C1, C2, C3, C4 on the numpad, we need the following algorithm:
+    total := 0
+    for from_symbol, to_symbol in [(A,C1), (C1,C2), (C2,C3), (C3,C4)]:
+      from_state = ('A',) * 25 + (from_symbol,)  # Initial state = robot1..robot25 all in position 'A'
+      to_state   = ('A',) * 25 + (to_symbol,)    # Final state = robot1..robot25 all in position 'A'
+      total += best_path_len(from_state, to_state) + 1
+    print(f'Best cost = {total}')
+
+This means we only need to focus on the individual transitions A->C1; C1->C2; ...
+
+
+Let us now focus on an example transition.
+Consider the end of our robot and pad chain:
+
+  ... - dirpad24 - robot24 - dirpad24 - robot25 - dirpad25 - robotNUM - numpad
+
+Assume C1='2'
+We only look at robot25 and robotNUM
+We start from position AA, and need to go to position A2
+
+In order to do this, we need robotNUM to move from A to 2.
+There are infinitely many paths to do this on the numpad such as <^  ^<  ^<^v< 
+Intuitively we think that the shortest paths on the numpad will lead to the shortest paths on the dirpadHUMAN.
+But we need to prove that that is indeed the case.
+
+
+1. It is always cheaper to do nothing than to do subsequent inverse operations such as >< <> ^v v^
+   i.o.w. moving from state ('A'...'A' P) to ('A'...'A' move(P)) to ('A'...'A' invmove(move(P))) == ('A'...'A' P) costs more than 0
+
+   Also for intermediate robots
+     moving from ('A'...'A' P Q1 Q2 ... Qn) -> ('A'...'A' move(P) Q1 Q2 ... Qn) -> ('A'...'A' invmove(move(P)) Q1 Q2 ... Qn) costs more than 0
+
+
+2. Inverse ops also do not make sense in longer paths
+   E.g. <^> at any intermediate pad results in a longer human path than ^ on the intermediate pad
+
+      
+
+3. Subsequent identical operations should be grouped i.e. >>^ is never more expensive than >^>
+   true for robot2..robot26
+
+   Let cost be the 'best cost' to execute a certain path at a certain level
+
+   cost(A>>^A, L) = 3 + cost(move(A,>), L-1) + cost(move(>,^), L-1) + cost(move(^,A), L-1)
+   cost(A>^>A, L) = 3 + cost(move(A,>), L-1) + cost(move(>,^), L-1) + cost(move(^,>), L-1) + cost(move(>,A), L-1)
+
+   Second one is never smaller than first one (but could be equal) due to property
+     cost(move(X,Y), L) <= cost(move(X,Z), L) + cost(move(Z,Y), L)
+
+
+https://www.reddit.com/r/adventofcode/comments/1hj2odw/comment/m34ek1r/
+
+
+
+Define
+
+ human - dirpadHUMAN - robot1 - dirpad1 - robot2 - dirpad2 - ... - robot25 - dirpad25 - robotNUM=robot26 - numpad
+
+   state is the stete of all 26 robots
+
+   all_shortest_paths([pos1, pos2, ..., posN], level) = set of all shortest paths (= doing minimal number of presses on dirpadHUMAN)
+       starting from state (A A A A ... A pos1 B1 C1 D1 ..)  with (level-1) times A) without pushing on robot <level>
+           going to state  (A A A A ... A pos2 B1 C1 D1 ..)  with (level-1) times A) without pushing on robot <level>
+       press A on dirpadHUMAN
+       starting from state (A A A A ... A pos2 B2 C2 D2 ..)  with (level-1) times A) without pushing on robot <level>
+           going to state  (A A A A ... A pos3 B2 C2 D2 ..)  with (level-1) times A) without pushing on robot <level>
+       press A on dirpadHUMAN
+       ...
+       starting from state (A A A A ... A pos(N-1) B(N-1) C(N-1) D(N-1) ..)  with (level-1) times A) without pushing on robot <level>
+           going to state  (A A A A ... A posN     B(N-1) C(N-1) D(N-1) ..)  with (level-1) times A) without pushing on robot <level>
+       press A on dirpadHUMAN
+       [[[ Note: final state is (A A A A ... A posN BN CN DN ..) ]]]
+
+   Note that if position A is not in pos1...posN, then the deeper robots B,C,D... will not change state along the shortest paths
+      i.e. B1=B2=...BN; C1=C2=....CN; ...
+
+   shortest_path_len([pos1, pos2, ..., posN], level) = size of every shortest path in all_shortest_paths([pos1, pos2, ..., posN], level)
+
+   Note: for notational simplicity we say that shortest_path_len([pos], level) = 0  since there are no transitions
+
+
+Properties
+
+   For N>1 and 1<=i<=N:
+   shortest_path_len([key1, key2, ..., keyN], level) = shortest_path_len([key1, key2], level) +
+                                                       shortest_path_len([key2, key3], level) +
+                                                       ... +
+                                                       shortest_path_len([key(N-1), keyN], level)
+                                                     = shortest_path_len([key1, ..., keyi], level) + shortest_path_len([keyi, ..., keyN], level)
+   if level == 1:
+       shortest_path_len([key1, key2], level=1) = 1
+   elif level >1::
+       if key1 == key2:
+           bestcost([key1, key1], level) = 1
+       else:
+           bestcost([key1, key2], level) > 1
+
+   shortest_path_len([key1, key2, ..., keyN], level) > 1    (for N>1)
+
+   shortest_path_len([key1, key2, ..., keyN], level=1) = N  (for N>1)
+   shortest_path_len([key1, key1, key2], level) = 1 + shortest_path_len([key1, key2], level)
+   shortest_path_len([key1, key2, key2], level) = 1 + shortest_path_len([key1, key2], level)
+
+   if key1 != key2:
+       shortest_path_len([key1, key2, key1], level) =  shortest_path_len([key1, key2], level) + shortest_path_len([key2, key1], level)
+                                                    >  shortest_path_len([key1, key2], level) + 1
+                                                    >  shortest_path_len([key1, key1, key2], level)
+       shortest_path_len([key1, key2, key1], level) =  shortest_path_len([key1, key2], level) + shortest_path_len([key2, key1], level)
+                                                    >  1 + shortest_path_len([key2, key1], level)
+                                                    >  shortest_path_len([key2, key1, key1], level)                                                    
+
+
+What we really try to prove:
+
+   shortest_path_len([keySrc, keyTgt], level) is:
+      Initial state   (A A .. A key1 B1 C1 D1 ...)
+        Goal state    (A A .. A key2 B1 C1 D1 ...)
+      press A on dirpadHUMAN
+
+   solution = we need the len of shortest paths between initial state and goal state
+
+   Claim: solution = shortest_path_len(['A', directionkey], level-1) + 1 + shortest_path_len([directionkey, 'A']], level-1) + 1
+                   = 2 + shortest_path_len(['A', directionkey], level-1) + shortest_path_len([directionkey, 'A']], level-1)
+
+   Reason = Any other path will at least contain 'directionkey' in the same direction as the boundary between keySrc and keyTgt
+            Suppose we have a shortest path of equal cost going through subsequent neighbours key1=keySrc, ..., keyi, keyj ..., keyN=keyTgt
+              altspl = shortest_path_len([key1, ...,  keyi, keyj, .., keyN], level)
+            At some point we need a move in directionkey keySrc->keyTg, say this happens between keyi->keyj
+              altspl = spl([key1, ..., keyi], level) + spl([keyi, keyj], level) + spl([keyj, ..., keyN], level)
+                     > 1 + spl([keyi, keyj], level)        # Since i>1 or N>j hence first and/or third term is larger than 1
+                     > 1 + ... TODO
+
+
+I think we need to prove this recursively
+
+     robot 1: going from a cell to neighbor requires 1 keypress by human.
+
+     robot 2: going from a cell to neighbor requires
+                1/ human keypresses to move robot1 from A to directionkey
+                2/ human keypress A
+                3/ human keypresses to move robot1 from directionkey to A
+                4/ human keypress A
+
+
+
+
+GENERAL PROOF
+
+   shortest_path_len([keySrc, key2, key3, ... keyK, keyTgt], level) with subsequent neighbours is:
+      Initial state   (A A .. A key1 B1 C1 D1 ...)
+        Goal state    (A A .. A key2 B1 C1 D1 ...)
+      press A on dirpadHUMAN
+
+   -> prove that shortest path over all possible order paths starting with keySrc ending with keyTgt
+      can be calculated by 1/ calculating locally all shortest paths from keysrc to keytgt (assuming cost 1)
+                           2/ taking min shortest_path_len(all locally shortest paths from keySrc to keyTgt)
+
+
+Can we prove (inductively) that:
+
+shortest_path_len([keySrc, key2, key3, ... keyK, keyTgt], level) with subsequent neighbours is
+    shortest_path_len(['A', 'dir(keySrc,key2)', 'A'], level-1)
+     + shortest_path_len(['A', 'dir(key2,key3)', 'A'], level-1)
+     + ...
+     + shortest_path_len(['A', 'dir(keyK,keyTgt)', 'A'], level-1)
+
+
+
+======================
+
+ human - dirpadHUMAN - robot_1 - dirpad_1 - robot_2 - dirpad_2 - ... - robot_25 - dirpad_25 - robot_NUM - numpad - output
+
+We can represent this as one infinite graph.
+  Nodes are (S_1, S_2, ... S_25, S_NUM, output)
+    S_i is the position of robot_i
+    S_NUM is the position of robot_NUM
+
+Every transition has a cost of 1 (i.e. 1 human input).
+
+Valid transitions can only change 1 component of the state vector. The last component (output string) can only change by appending.
+   Human presses an arrow key:
+       (S_1, S_2, ... S_25, S_NUM, output)       -> (S_1', S_2, ... S_25, S_NUM, output)            where S_1' is a neighbor of S_1
+   Human presses A key:
+       (S_1, S_2, ... S_25, S_NUM, output)       -> (S_1, S_2', ... S_25, S_NUM, output)            where S_1 is not A and S_2' is a neighbor of S_2
+       (A,   S_2, ... S_25, S_NUM, output)       -> (A,   S_2, S_3', ... S_25, S_NUM, output)       where S_2 is not A and S_3' is a neighbor of S_3
+       (A,   A,   S_3, ..., S_25, S_NUM, output) -> (A,  A,    S_3, S_4', ... S_25, S_NUM, output)  where S_3 is not A and S_4' is a neighbor of S_4
+       ....
+       (A, ..., A, S_25, S_NUM, output)          -> (A, ..., A, S_25, S_NUM', output)               where S_25 is not A and S_NUM' is a neibhor of S_NUM
+       (A, ..., A, S_25, S_NUM, output)          -> (A, ..., A, A,    S_NUM,  output + S_NUM)       (concatenated output)
+
+
+Initial state is (A, A, ..., A, "")
+
+The goal is to find the length of the shortest path(s) from initial state to (*, *, ... *, "CODE") where * can be any value.
+
+spl is acronym for shortest_path_len
+
+As the output can only grow through the last transition, our problem is equivalent to finding the shortest path that subsequently visits:
+
+0. (A, A, ..., A, A, "")                 # Initial state
+1a. (A, A, ..., A, CODE[0], "")          # state before writing first output char
+1b. (A, A, ..., A, CODE[0], CODE[:1])    # state after writing first output char
+2a. (A, A, ..., A, CODE[1], CODE[:1])    # before 2
+2b. (A, A, ..., A, CODE[1], CODE[:2])    # after 2
+3a. (A, A, ..., A, CODE[2], CODE[:2])    # before 3
+3b. (A, A, ..., A, CODE[2], CODE[:3])    # after 3
+4a. (A, A, ..., A, CODE[3], CODE[:3])    # before 4
+4b. (A, A, ..., A, CODE[3], CODE[:4])    # after 4 = Goal state
+
+Transitions from 1a->1b , 2a->2b, 3a->3b, 4a->4b have cost 1 (just a single key press of the A button on dirpadHUMAN)
+
+solution = spl(0,4b) = spl(0,1a) + 1 + spl(1b,2a) + 1 + spl(2b,3a) + 1 + spl
+
+
+As a general strategy we need a value for spl( (A,A,...,A,numkeyFrom,CODE), (A,A,...,A,numkeyTo,CODE) ) for all combinations (numkeyFrom, numkeyTo).
+
+Simple result: spl( state, state ) = 0   (state to itself)
+
+
+---
+
+In order to go from state (A,A,...,A,numkeyFrom,CODE) to (A,A,...,A,numkeyTo,CODE) the robotNUM needs to physically move from numkeyFrom to numkeyTo using one or more steps, where numrobot moves to an adjacent position on the numeric keypad. Suppose we see it move over numkey1..numkey6:
+   (A,A,...,A,numkey1=numkeyFrom,CODE)
+   (?,?,....?,numkey2,CODE)
+   (?,?,....?,numkey3,CODE)
+   (?,?,....?,numkey4,CODE)
+   (?,?,....?,numkey5,CODE)
+   (A,A,...,A,numkey6=numkeyFrom,CODE)
+
+ human - dirpad_HUMAN - robot_1 - dirpad_1 - robot_2 - dirpad_2 - ... dirpad_24 - robot_25 - dirpad_25 - robot_NUM - numpad - output
+
+As discussed earlier S_NUM can only change if human presses A button, AND S_25 is not A and S_NUM' is a neighbor of S_NUM
+    (A, ..., A, S_25, S_NUM, output) -> (A, ..., A, S_25, S_NUM', output)
+
+A path from (A,A,...,A,numkey0,CODE) to (A,A,...,A,numkey5,CODE) where S_25 evolves from numkey0 -> numkey1 -> ... -> numkey5 will visit intermediate states for certain values of dir1..dir5  (5 is an example, could be another number of steps)
+             S_25
+   (A,A,..,A,A,    numkey0,CODE)    # initial # numkey1 == numkeyFrom
+   (A,A,..,A,dir1, numkey0,CODE)
+   (A,A,..,A,dir1, numkey1,CODE)    # cost = 1
+   (A,A,..,A,dir2, numkey1,CODE)
+   (A,A,..,A,dir2, numkey2,CODE)    # cost = 1
+   (A,A,..,A,dir3, numkey2,CODE)
+   (A,A,..,A,dir3, numkey3,CODE)    # cost = 1
+   (A,A,..,A,dir4, numkey3,CODE)
+   (A,A,..,A,dir4, numkey4,CODE)    # cost = 1
+   (A,A,..,A,dir5, numkey4,CODE)
+   (A,A,..,A,dir5, numkey5,CODE)    # cost = 1
+   (A,A,..,A,A,    numkey5,CODE)    # numkey6 == numkeyTo
+
+The shortest path length of all constrained paths from (A,A,...,A,numkey0,CODE) to (A,A,...,A,numkey5,CODE) constrained to S_25 evolving from (numkey0->numkey1->...->numkey5) will be the sum of the shortest paths lengths due to the forced intermediate states. That sum equals
+   spl( (A,A,..,A,A,    numkey0,CODE), (A,A,..,A,dir1, numkey0,CODE) ) +
+   1 +
+   spl( (A,A,..,A,dir1, numkey1,CODE), (A,A,..,A,dir2, numkey1,CODE) ) +
+   1 +
+   spl( (A,A,..,A,dir2, numkey2,CODE), (A,A,..,A,dir3, numkey2,CODE) ) +
+   1 +
+   spl( (A,A,..,A,dir3, numkey3,CODE), (A,A,..,A,dir4, numkey3,CODE) ) +
+   1 +
+   spl( (A,A,..,A,dir4, numkey4,CODE), (A,A,..,A,dir5, numkey4,CODE) ) +
+   1 +
+   spl( (A,A,..,A,dir5, numkey5,CODE), (A,A,..,A,A,    numkey5,CODE) )
+
+
+The values dir* are in {<, >, ^, v}
+The number 5 could be anything.
+
+
+We now observe that to go from numkey0 to numkey5 we may need a horizontal movement of 0/1/2 positions, and a vertical movement of 0/1/2/3 positions.
+Moreover, the robot can never leave the numpad!
+
+
+----
+
+We now prove that
+     the spl from (A,A,...,A,numkey0,CODE) to (A,A,...,A,numkey5,CODE) 
+       equals
+     the minimum of the spl's from (A,A,...,A,numkey0,CODE) to (A,A,...,A,numkey5,CODE) constrained to a local shortest path on the numpad
+
+
+
+First prove that directly going to a neighbor is adventageous.
+Let's use an example going from 5 to 4
+    1/ There is a locally shortest     path   <   visiting 5-4
+    2/ There is a locally non-shortest path  ^<v  visiting 5-8-7-4
+
+
+Path 1 has spl:
+   spl( (A,A,..,A, A, 5, CODE), (A,A,..,A, <, 5, CODE) ) +
+   1 +
+   spl( (A,A,..,A, <, 4, CODE), (A,A,..,A, A, 4, CODE) )
+
+Path 2 has spl:
+   spl( (A,A,..,A, A, 5, CODE), (A,A,..,A, ^, 5, CODE) ) +
+   1 +
+   spl( (A,A,..,A, ^, 8, CODE), (A,A,..,A, <, 8, CODE) ) +
+   1 +
+   spl( (A,A,..,A, <, 7, CODE), (A,A,..,A, v, 7, CODE) ) +
+   1 +
+   spl( (A,A,..,A, v, 4, CODE), (A,A,..,A, A, 4, CODE) )
+
+
+We need a useful property (TODO: prove this) 
+    spl( (S_1, ... S_i, T_i+1, ... T_25, T_NUM, T_CODE), (S_1, ... S_i', T_i+1, ... T_25, T_NUM, T_CODE) )
+ == spl( (S_1, ... S_i, U_i+1, ... U_25, U_NUM, U_CODE), (S_1, ... S_i', U_i+1, ... U_25, U_NUM, U_CODE) )
+
+
+Another useful property is that an unconstrained spl between start & end is always less than or equal to a constrained spl for paths between start & end which are forced to visit intermediate states.
+
+Another useful property for constrained paths:
+   spl(constrained path q1-q2-q3-..-qn) = spl(unconstrained path q1-q2) + spl(unconstr path q2-q3) + ... + spl(unconstr path q_n-1 to qn)
+
+Looking back at path 1 and path 2
+
+Path 2 spl equals
+   3 + spl( (A,A,..,A, A, 5, CODE), (A,A,..,A, ^, 5, CODE) ) + spl( (A,A,..,A, ^, 5, CODE), (A,A,..,A, <, 5, CODE) )
+     + spl( (A,A,..,A, <, 4, CODE), (A,A,..,A, v, 4, CODE) ) + spl( (A,A,..,A, v, 4, CODE), (A,A,..,A, A, 4, CODE) )
+
+
+We know that spl( (A,A,..,A, A, 5, CODE), (A,A,..,A, ^, 5, CODE) ) + spl( (A,A,..,A, ^, 5, CODE), (A,A,..,A, <, 5, CODE) )
+             > spl( (A,A,..,A, A, 5, CODE), (A,A,..,A, <, 5, CODE) )
+since the LHS is the spl of a constrained path, and the RHS is the spl of an unconstrained path with same start en end state
+
+Hence path 2 costs at least 2 more than path 1 !
+
+
+
+
+In general, the path between numkey0 and numkey1 will require subsequent movement directions which make the numrobot move:
+    spl A -> dir1
+    + 1
+    + spl dir1 -> dir2
+    + 1
+    + ...
+    + 1
+    + spl dirN -> A
+
+If numrobot needs to do a net horizontal movement (<<, <, >, >>) we know that ANY path will need to execute those 1 or 2 horiz movements.
+If numrobot needs to do a net vertical movement (^^^ ^^ ^ v vv vvv) we know that ANY path will need to execute those 1/2/3 vertic movements.
+
+
+We prove that
+   Let hmove be in {<,>}
+   Let vmove be in {^,v}
+   Any valid path between pos1 and pos2 is at least as expensive as the minimum cost of the valid rectangular paths.
+   
+   Proof: 1. Suppose this is a single direction i.e. pos1 and pos2 are in the same row or column, D positions apart, in direction <dir> (which could be <>^v)
+
+             Suppose we have a local path from pos1 to pos2. This local path must move at least D times in direction <dir>
+               The controller of the pad will have to go at least once from A to <dir>, once from <dir> back to A, and press button at least D times
+
+             That path is at least as expensive as the path where the controller moves finger from A -> <dir>; presses button D times; moves from <dir> -> A (unconstrained)
+
+             Therefore it suffices to only look at local paths which go straight from pos1 to pos2.
+             Its cost is the sum of
+                 1 level up: move from A to <dir>
+                 1 level up: press D times
+                 1 level up: move from <dir> to A
+
+
+          2. Suppose there are both changes in row and column. Say DCOL and DROW in directions <hdir> and <vdir>
+
+             Due to the topology of both pads, any local path will move in direction <hdir> at least DCOL times, and move in direction <vdir> at least DROW times.
+             Also due to the topology of both pads, between any 2 positions, at least 1 valid rectangular path exists, and at most 2.
+
+             Take any local path from pos1 to pos2. Check which move <hdir> or <vdir> appears first. Call this <firstdir>. The other one is <seconddir>
+               The controller of the pad will need to go at least from A to <firstdir>, from <firstdir> to <seconddir>, and from <seconddir> to A, and press button DROW + DCOL times
+
+             This is at least as expensive as (unconstrained paths)
+                 1 level up: move from A to <firstdir>
+                 1 level up: press DFIRST times
+                 1 level up: move from <firstdir> to <seconddir>
+                 1 level up: press DSECOND times
+                 1 level up: move from <seconddir> to A
+
+             We can also say that this is at least as expensive as the minimum of
+                 1) 1 level up: move from A -> <hdir> -> <vdir> -> A, plus DCOL+DROW presses
+                 2) 1 level up: move from A -> <vdir> -> <hdir> -> A, plus DCOL+DROW presses
+
+             To deal with illegal paths. On numpad: from col0 to row3 or from row3 to col0. On dirpad: from col0 to row0 or from row0 to col0
+               * => there is always 1 valid rectangular path say dir1...dir2
+               * => all valid paths have the property that there is a dir2 after dir1.
+                    Prove example on numpad from col0 to row3. rectangular path is first > then v
+                      Suppose there is a path that does no v movement in any move later than a > 
+                      Then in its first part it can do moves (v ^ <) and in its second part it can do (^ < >)
+                       -> In the first part: > is not allowed, < is impossible. It can only go up and down and stay in col0. Hence it stays in rows 0,1,2
+                       -> In the second part: vertically it can only go up. Hence it is not possible to every reach row 3.
+               * Since all valid paths have a dir2 after dir1, we can prove that no valid path can be cheaper than the rectangular path
+
+
+Conclusion:
+  - cost of moving human finger is zero
+  - for each robot we need to calculate the cost of moving between 2 buttons, based on the cost of 1 level higher. Only need to know the following costs of previous level
+      A<  <A  A>  >A  Av  vA  A^  ^A  ^<  <^  ^>  >^  v<  <v  v>  >v
